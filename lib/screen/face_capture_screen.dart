@@ -34,20 +34,38 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
     _faceAuthService.initialize();
   }
 
+  bool _cameraError = false;
+
   Future<void> _initializeCamera() async {
-    final cameras = await availableCameras();
-    final frontCamera = cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => cameras.first,
-    );
+    try {
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        setState(() {
+          _cameraError = true;
+          _statusMessage = "No cameras available.";
+        });
+        return;
+      }
+      
+      final frontCamera = cameras.firstWhere(
+        (camera) => camera.lensDirection == CameraLensDirection.front,
+        orElse: () => cameras.first,
+      );
 
-    _cameraController = CameraController(
-      frontCamera,
-      ResolutionPreset.medium,
-      enableAudio: false,
-    );
+      _cameraController = CameraController(
+        frontCamera,
+        ResolutionPreset.medium,
+        enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.jpeg,
+      );
 
-    await _cameraController!.initialize();
+      await _cameraController!.initialize();
+    } catch (e) {
+      setState(() {
+        _cameraError = true;
+        _statusMessage = "Camera initialization failed: $e";
+      });
+    }
     if (mounted) setState(() {});
   }
 
@@ -56,7 +74,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
 
     setState(() {
       _isProcessing = true;
-      _statusMessage = "Processing your face...";
+      _statusMessage = "Processing your face...\nPlease wait for a minute.";
     });
 
     try {
@@ -71,7 +89,7 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
         return;
       }
 
-      // Pass it to the Bloc to handle
+      
       context.read<AuthBloc>().add(
         FaceVerificationCompleted(widget.user, embedding, widget.isSignUp),
       );
@@ -93,6 +111,22 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_cameraError) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Camera Error")),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Text(
+              _statusMessage,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_cameraController == null || !_cameraController!.value.isInitialized) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -138,7 +172,17 @@ class _FaceCaptureScreenState extends State<FaceCaptureScreen> {
                       Container(
                         color: Colors.black54,
                         child: const Center(
-                          child: CircularProgressIndicator(color: Colors.white),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(color: Colors.white),
+                              SizedBox(height: 16),
+                              Text(
+                                "Please wait for a minute...",
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],

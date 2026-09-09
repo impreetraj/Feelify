@@ -8,6 +8,7 @@ class PostModel {
   final String photourl;
   final String? reaction;
   final int likeCount;
+  final String mediaType; // 'image' or 'video'
 
   PostModel({
     this.id,
@@ -19,6 +20,7 @@ class PostModel {
     required this.timestamp,
     this.reaction,
     this.likeCount = 0,
+    this.mediaType = 'image',
   });
 
   Map<String, dynamic> toMap() {
@@ -32,6 +34,7 @@ class PostModel {
       'timestamp': timestamp,
       'reaction': reaction,
       'likeCount': likeCount,
+      'mediaType': mediaType,
     };
   }
 
@@ -46,6 +49,7 @@ class PostModel {
       timestamp: map['timestamp'],
       reaction: map['reaction'],
       likeCount: map['likeCount'] ?? 0,
+      mediaType: map['mediaType'] ?? 'image',
     );
   }
 }

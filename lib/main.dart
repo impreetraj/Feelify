@@ -130,7 +130,7 @@ void main() async {
       case Event.actionCallAccept:
         final callId = event.body['extra']?['callId'] ?? '';
         print("[CALLKIT] Call accepted: $callId");
-        // Update Firestore status
+        
         await FirebaseFirestore.instance.collection('calls').doc(callId).update(
           {'status': 'accepted'},
         );
@@ -232,7 +232,8 @@ class MyApp extends StatelessWidget {
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           ),
-          home: BlocBuilder<AuthBloc, AuthState>(
+          home: 
+          BlocBuilder<AuthBloc, AuthState>(
             builder: (context, state) {
               if (state is Authenticated) {
                 return const AppLockScreen();
@@ -245,7 +246,16 @@ class MyApp extends StatelessWidget {
               }
 
               return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+                body: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text("Wait a minute...", style: TextStyle(fontSize: 16)),
+                    ],
+                  ),
+                ),
               );
             },
           ),

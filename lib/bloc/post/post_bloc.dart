@@ -40,6 +40,7 @@ class PostBloc extends Bloc<PostEvent, PostState> {
             'imageUrl': event.post.imagePath,
             'userName': event.post.userName,
             'photourl': event.post.photourl,
+            'mediaType': event.post.mediaType,
             'createdAt': FieldValue.serverTimestamp(),
           };
 

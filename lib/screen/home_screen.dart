@@ -7,6 +7,7 @@ import 'package:chat_ikokas/bloc/like/like_bloc.dart';
 import 'package:chat_ikokas/bloc/like/like_event.dart';
 import 'package:chat_ikokas/bloc/like/like_state.dart';
 import 'package:chat_ikokas/screen/upload_screen.dart';
+import 'package:chat_ikokas/widgets/video_post_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -19,6 +20,7 @@ import 'dart:async';
 import 'package:chat_ikokas/bloc/comment/comment_state.dart';
 import 'package:chat_ikokas/models/comment_model.dart';
 import 'package:chat_ikokas/services/local_notification_service.dart';
+import 'package:flutter/rendering.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,12 +35,26 @@ class _HomeScreenState extends State<HomeScreen> {
   late final String _startupTime;
   StreamSubscription<QuerySnapshot>? _notificationSubscription;
   Set<String> _loadedLikePostIds = {};
+  bool _isUploadVisible = true;
+  late Stream<QuerySnapshot> _postsStream;
 
   @override
   void initState() {
     super.initState();
     _startupTime = DateTime.now().toIso8601String();
     _listenForNotifications();
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _postsStream = FirebaseFirestore.instance
+          .collection('feeds')
+          .doc(user.uid)
+          .collection('posts')
+          .orderBy('createdAt', descending: true)
+          .snapshots();
+    } else {
+      _postsStream = const Stream<QuerySnapshot>.empty();
+    }
   }
 
   void _listenForNotifications() {
@@ -447,280 +463,307 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(title: Text("Chat-Ikokas")),
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsetsGeometry.all(8.0),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        color: const Color.fromARGB(26, 243, 98, 98),
-                      ),
-                      child: Icon(Icons.person),
-                    ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => UploadScreen(),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        alignment: Alignment.centerLeft,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.black, width: 1.5),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 10),
-                          child: Text("What's on your mind?"),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: Icon(Icons.photo),
-                    ),
-                  ),
-                ],
-              ),
-              const Divider(thickness: 1),
-              Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseAuth.instance.currentUser != null
-                      ? FirebaseFirestore.instance
-                            .collection('feeds')
-                            .doc(FirebaseAuth.instance.currentUser!.uid)
-                            .collection('posts')
-                            .orderBy('createdAt', descending: true)
-                            .snapshots()
-                      : const Stream<QuerySnapshot>.empty(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (snapshot.hasError) {
-                      return Center(child: Text("Error: ${snapshot.error}"));
-                    }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return const Center(
-                        child: Text(
-                          "No posts in your feed yet. Start following people!",
-                        ),
-                      );
-                    }
-
-                    final posts = snapshot.data!.docs.map((doc) {
-                      final data = doc.data() as Map<String, dynamic>;
-                      return PostModel(
-                        id: doc.id,
-                        userId: data['userId'] ?? '',
-                        imagePath: data['imageUrl'] ?? '',
-                        caption: data['content'] ?? '',
-                        userName: data['userName'] ?? '',
-                        photourl: data['photourl'] ?? '',
-                        timestamp: data['createdAt'] != null
-                            ? (data['createdAt'] as Timestamp)
-                                  .toDate()
-                                  .toString()
-                                  .substring(0, 16)
-                            : DateTime.now().toString().substring(0, 16),
-                        reaction: data['reaction'],
-                        likeCount: data['likeCount'] ?? 0,
-                      );
-                    }).toList();
-
-                    // Load like data for new posts only
-                    final postIds = posts
-                        .where((p) => p.id != null)
-                        .map((p) => p.id!)
-                        .toList();
-                    final newPostIds = postIds.where((id) => !_loadedLikePostIds.contains(id)).toList();
-                    if (newPostIds.isNotEmpty) {
-                      _loadedLikePostIds.addAll(newPostIds);
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        context.read<LikeBloc>().add(LoadLikes(postIds));
-                      });
-                    }
-
-                    return ListView.builder(
-                      itemCount: posts.length,
-                      itemBuilder: (context, index) {
-                        final post = posts[index];
-                        return Card(
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      backgroundImage: post.photourl.isNotEmpty ? NetworkImage(post.photourl) : null,
-                                      child: post.photourl.isEmpty ? const Icon(Icons.person) : null,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            post.userName,
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            post.timestamp,
-                                            style: TextStyle(
-                                              color: Colors.grey.shade600,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    
-                                  ],
-                                ),
-                              ),
-                              if (post.caption.isNotEmpty)
+        child: NotificationListener<UserScrollNotification>(
+          onNotification: (notification) {
+            if (notification.direction == ScrollDirection.forward) {
+              if (!_isUploadVisible) setState(() => _isUploadVisible = true);
+            } else if (notification.direction == ScrollDirection.reverse) {
+              if (_isUploadVisible) setState(() => _isUploadVisible = false);
+            }
+            return false;
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              children: [
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  child: _isUploadVisible
+                      ? Column(
+                          children: [
+                            Row(
+                              children: [
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8.0,
-                                    vertical: 4.0,
-                                  ),
-                                  child: Text(post.caption),
-                                ),
-                              const SizedBox(height: 8),
-                              if (post.imagePath.startsWith('http'))
-                                Image.network(
-                                  post.imagePath,
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                )
-                              else if (post.imagePath.isNotEmpty)
-                                Image.file(
-                                  File(post.imagePath),
-                                  width: double.infinity,
-                                  fit: BoxFit.cover,
-                                ),
-                              Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    BlocBuilder<LikeBloc, LikeState>(
-                                      builder: (context, likeState) {
-                                        String currentUserReaction = '';
-                                        bool isLikedByCurrentUser = false;
-                                        int realLikeCount = 0;
-
-                                        if (likeState is LikesLoaded) {
-                                          final userLike = likeState.userLikes[post.id];
-                                          if (userLike != null && userLike.reaction.isNotEmpty) {
-                                            isLikedByCurrentUser = true;
-                                            currentUserReaction = userLike.reaction;
-                                          }
-                                          realLikeCount = likeState.likeCounts[post.id] ?? 0;
-                                        }
-
-                                        return GestureDetector(
-                                          onLongPressStart: (details) {
-                                            _showReactionMenu(
-                                              context,
-                                              details.globalPosition,
-                                              post,
-                                              isLikedByCurrentUser,
-                                            );
-                                          },
-                                          onTapUp: (details) {
-                                            if (post.id != null) {
-                                              final newReaction = isLikedByCurrentUser ? '' : '👍';
-                                              
-                                              context.read<LikeBloc>().add(
-                                                ToggleLike(
-                                                  post.id!,
-                                                  post.userId,
-                                                  newReaction,
-                                                ),
-                                              );
-                                              
-                                              if (newReaction.isNotEmpty) {
-                                                _showFloatingAnimation(
-                                                  context,
-                                                  newReaction,
-                                                  details.globalPosition,
-                                                );
-                                              }
-                                            }
-                                          },
-                                          child: Row(
-                                            children: [
-                                              if (isLikedByCurrentUser)
-                                                Text(
-                                                  currentUserReaction,
-                                                  style: const TextStyle(fontSize: 18),
-                                                )
-                                              else
-                                                const Icon(Icons.thumb_up_alt_outlined),
-                                              const SizedBox(width: 4),
-                                              Text(isLikedByCurrentUser ? "Reacted" : "Like"),
-                                              if (realLikeCount > 0)
-                                                Padding(
-                                                  padding: const EdgeInsets.only(left: 4.0),
-                                                  child: Text("($realLikeCount)"),
-                                                ),
-                                            ],
-                                          ),
-                                        );
-                                      },
+                                  padding: const EdgeInsets.all(10.0),
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(30),
+                                      color: const Color.fromARGB(26, 243, 98, 98),
                                     ),
-                                    GestureDetector(
-                                      onTap: () {
-                                        _showCommentBox(context, post);
-                                      },
-                                      child: Row(
-                                        children: const [
-                                          Icon(Icons.comment_outlined),
-                                          SizedBox(width: 4),
-                                          Text("Comment"),
-                                        ],
+                                    child: Icon(Icons.person),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => UploadScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      alignment: Alignment.centerLeft,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: Colors.black, width: 1.5),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(left: 10),
+                                        child: Text("What's on your mind?"),
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                                Padding(
+                                  padding: const EdgeInsets.all(10.0),
+                                  child: Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                    child: Icon(Icons.photo),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(thickness: 1),
+                          ],
+                        )
+                      : const SizedBox(height: 0, width: double.infinity),
+                ),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: _postsStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return Center(child: Text("Error: ${snapshot.error}"));
+                      }
+                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            "No posts in your feed yet. Start following people!",
                           ),
                         );
-                      },
-                    );
-                  },
+                      }
+
+                      final posts = snapshot.data!.docs.map((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        return PostModel(
+                          id: doc.id,
+                          userId: data['userId'] ?? '',
+                          imagePath: data['imageUrl'] ?? '',
+                          caption: data['content'] ?? '',
+                          userName: data['userName'] ?? '',
+                          photourl: data['photourl'] ?? '',
+                          timestamp: data['createdAt'] != null
+                              ? (data['createdAt'] as Timestamp)
+                                    .toDate()
+                                    .toString()
+                                    .substring(0, 16)
+                              : DateTime.now().toString().substring(0, 16),
+                          reaction: data['reaction'],
+                          likeCount: data['likeCount'] ?? 0,
+                          mediaType: data['mediaType'] ?? 'image',
+                        );
+                      }).toList();
+
+                  
+                      final postIds = posts
+                          .where((p) => p.id != null)
+                          .map((p) => p.id!)
+                          .toList();
+                      final newPostIds = postIds.where((id) => !_loadedLikePostIds.contains(id)).toList();
+                      if (newPostIds.isNotEmpty) {
+                        _loadedLikePostIds.addAll(newPostIds);
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          context.read<LikeBloc>().add(LoadLikes(postIds));
+                        });
+                      }
+
+                      return ListView.builder(
+                        itemCount: posts.length,
+                        itemBuilder: (context, index) {
+                          final post = posts[index];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        backgroundImage: post.photourl.isNotEmpty ? NetworkImage(post.photourl) : null,
+                                        child: post.photourl.isEmpty ? const Icon(Icons.person) : null,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              post.userName,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            Text(
+                                              post.timestamp,
+                                              style: TextStyle(
+                                                color: Colors.grey.shade600,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      BlocBuilder<LikeBloc, LikeState>(
+                                        builder: (context, likeState) {
+                                          String currentUserReaction = '';
+                                          bool isLikedByCurrentUser = false;
+                                          int realLikeCount = 0;
+
+                                          if (likeState is LikesLoaded) {
+                                            final userLike = likeState.userLikes[post.id];
+                                            if (userLike != null && userLike.reaction.isNotEmpty) {
+                                              isLikedByCurrentUser = true;
+                                              currentUserReaction = userLike.reaction;
+                                            }
+                                            realLikeCount = likeState.likeCounts[post.id] ?? 0;
+                                          }
+
+                                          return GestureDetector(
+                                            onLongPressStart: (details) {
+                                              _showReactionMenu(
+                                                context,
+                                                details.globalPosition,
+                                                post,
+                                                isLikedByCurrentUser,
+                                              );
+                                            },
+                                            onTapUp: (details) {
+                                              if (post.id != null) {
+                                                final newReaction = isLikedByCurrentUser ? '' : '👍';
+                                                
+                                                context.read<LikeBloc>().add(
+                                                  ToggleLike(
+                                                    post.id!,
+                                                    post.userId,
+                                                    newReaction,
+                                                  ),
+                                                );
+                                                
+                                                if (newReaction.isNotEmpty) {
+                                                  _showFloatingAnimation(
+                                                    context,
+                                                    newReaction,
+                                                    details.globalPosition,
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            child: Row(
+                                              children: [
+                                                if (isLikedByCurrentUser)
+                                                  Text(
+                                                    currentUserReaction,
+                                                    style: const TextStyle(fontSize: 18),
+                                                  )
+                                                else
+                                                  const Icon(Icons.thumb_up_alt_outlined, size: 20),
+                                                if (realLikeCount > 0)
+                                                  Padding(
+                                                    padding: const EdgeInsets.only(left: 4.0),
+                                                    child: Text("$realLikeCount", style: const TextStyle(fontSize: 14)),
+                                                  ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 16),
+                                      GestureDetector(
+                                        onTap: () {
+                                          _showCommentBox(context, post);
+                                        },
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.comment_outlined, size: 20),
+                                            if (post.id != null)
+                                              StreamBuilder<QuerySnapshot>(
+                                                stream: FirebaseFirestore.instance
+                                                    .collection('comments')
+                                                    .where('postId', isEqualTo: post.id)
+                                                    .snapshots(),
+                                                builder: (context, commentSnap) {
+                                                  final count = commentSnap.hasData
+                                                      ? commentSnap.data!.docs.length
+                                                      : 0;
+                                                  if (count == 0) return const SizedBox.shrink();
+                                                  return Padding(
+                                                    padding: const EdgeInsets.only(left: 4.0),
+                                                    child: Text("$count", style: const TextStyle(fontSize: 14)),
+                                                  );
+                                                },
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (post.caption.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8.0,
+                                      vertical: 2.0,
+                                    ),
+                                    child: Text(post.caption),
+                                  ),
+                                const SizedBox(height: 4),
+                             
+                                if (post.mediaType == 'video' && post.imagePath.startsWith('http'))
+                                  SizedBox(
+                                    height: MediaQuery.of(context).size.height * 0.18, 
+                                    width: double.infinity,
+                                    child: VideoPostPlayer(videoUrl: post.imagePath),
+                                  )
+                                else if (post.imagePath.startsWith('http'))
+                                  Image.network(
+                                    post.imagePath,
+                                    width: double.infinity,
+                                    height: MediaQuery.of(context).size.height * 0.18,
+                                    fit: BoxFit.cover,
+                                  )
+                                else if (post.imagePath.isNotEmpty)
+                                  Image.file(
+                                    File(post.imagePath),
+                                    width: double.infinity,
+                                    height: MediaQuery.of(context).size.height * 0.18,
+                                    fit: BoxFit.cover,
+                                  ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

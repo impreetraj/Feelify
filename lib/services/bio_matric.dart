@@ -4,26 +4,28 @@ class BioMatric {
   final LocalAuthentication localauth = LocalAuthentication();
 
   Future<bool> authenticateLocally() async {
-    bool isAuthenticate = false;
-
     try {
-      isAuthenticate = await localauth.authenticate(
+      final bool isSupported = await localauth.isDeviceSupported();
+      if (!isSupported) {
+        return true;
+      }
+
+      return await localauth.authenticate(
         localizedReason: "Please authenticate to access the app",
       );
     } on LocalAuthException catch (e) {
-      if (e.code == LocalAuthExceptionCode.noBiometricHardware) {
-        // Add handling of no hardware here.
-      } else if (e.code == LocalAuthExceptionCode.temporaryLockout ||
-          e.code == LocalAuthExceptionCode.biometricLockout) {
-        // ...
-      } else {
-        // ...
+      final code = e.code.toString();
+      if (code == 'NotEnrolled' || code == 'PasscodeNotSet' || code == 'NotAvailable' || code == 'noBiometricHardware') {
+        return true; 
       }
+      return false;
     } catch (e) {
-      isAuthenticate = false;
+      final errorStr = e.toString().toLowerCase();
+      if (errorStr.contains('notenrolled') || errorStr.contains('passcodenotset') || errorStr.contains('notavailable')) {
+        return true;
+      }
+      return false;
     }
-
-    return isAuthenticate;
   }
 }
 
