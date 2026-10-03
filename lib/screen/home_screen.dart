@@ -1,17 +1,13 @@
 import 'dart:io';
-import 'package:chat_ikokas/bloc/post/post_bloc.dart';
-import 'package:chat_ikokas/bloc/post/post_event.dart';
-import 'package:chat_ikokas/bloc/post/post_state.dart';
 import 'package:chat_ikokas/models/post_model.dart';
 import 'package:chat_ikokas/bloc/like/like_bloc.dart';
 import 'package:chat_ikokas/bloc/like/like_event.dart';
 import 'package:chat_ikokas/bloc/like/like_state.dart';
 import 'package:chat_ikokas/screen/upload_screen.dart';
+import 'package:chat_ikokas/screen/user_profile_screen.dart';
 import 'package:chat_ikokas/widgets/video_post_player.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:chat_ikokas/bloc/comment/comment_bloc.dart';
@@ -34,7 +30,7 @@ String? name = FirebaseAuth.instance.currentUser!.displayName;
 class _HomeScreenState extends State<HomeScreen> {
   late final String _startupTime;
   StreamSubscription<QuerySnapshot>? _notificationSubscription;
-  Set<String> _loadedLikePostIds = {};
+  final Set<String> _loadedLikePostIds = {};
   bool _isUploadVisible = true;
   late Stream<QuerySnapshot> _postsStream;
 
@@ -461,7 +457,16 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Chat-Ikokas")),
+      appBar: AppBar(
+        title: const Text(
+          "Feelify",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 22,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: NotificationListener<UserScrollNotification>(
           onNotification: (notification) {
@@ -595,165 +600,329 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemBuilder: (context, index) {
                           final post = posts[index];
                           return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                            elevation: 1.5,
+                            shadowColor: Colors.black12,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                            clipBehavior: Clip.antiAlias,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // 1. Post Header: Avatar, Name, Timestamp (tap opens profile)
                                 Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                                  child: Row(
-                                    children: [
-                                      CircleAvatar(
-                                        backgroundImage: post.photourl.isNotEmpty ? NetworkImage(post.photourl) : null,
-                                        child: post.photourl.isEmpty ? const Icon(Icons.person) : null,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14.0,
+                                    vertical: 10.0,
+                                  ),
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {
+                                      if (post.userId.isNotEmpty) {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => UserProfileScreen(
+                                              userId: post.userId,
+                                              username: post.userName,
+                                              name: post.userName,
+                                              profile: post.photourl,
+                                              bio: '',
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: Colors.grey.shade200,
+                                          backgroundImage: post.photourl.isNotEmpty
+                                              ? NetworkImage(post.photourl)
+                                              : null,
+                                          child: post.photourl.isEmpty
+                                              ? const Icon(Icons.person, size: 22, color: Colors.grey)
+                                              : null,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                post.userName.isNotEmpty ? post.userName : 'User',
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 15,
+                                                  letterSpacing: 0.1,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                post.timestamp,
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade600,
+                                                  fontSize: 11.5,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                // 2. Caption (if present)
+                                if (post.caption.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 14.0,
+                                      right: 14.0,
+                                      bottom: 12.0,
+                                    ),
+                                    child: Text(
+                                      post.caption,
+                                      style: const TextStyle(
+                                        fontSize: 14.5,
+                                        height: 1.4,
+                                        color: Colors.black87,
                                       ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              post.userName,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
+                                    ),
+                                  ),
+
+                                // 3. Media (Video or Image)
+                                if (post.mediaType == 'video' && post.imagePath.startsWith('http'))
+                                  Container(
+                                    constraints: const BoxConstraints(maxHeight: 460, minHeight: 220),
+                                    width: double.infinity,
+                                    color: Colors.black,
+                                    child: VideoPostPlayer(
+                                      key: ValueKey(post.imagePath),
+                                      videoUrl: post.imagePath,
+                                    ),
+                                  )
+                                else if (post.imagePath.startsWith('http'))
+                                  Container(
+                                    constraints: const BoxConstraints(maxHeight: 480, minHeight: 200),
+                                    width: double.infinity,
+                                    color: Colors.grey.shade100,
+                                    child: Image.network(
+                                      post.imagePath,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (context, child, progress) {
+                                        if (progress == null) return child;
+                                        return Container(
+                                          height: 250,
+                                          color: Colors.grey.shade100,
+                                          child: Center(
+                                            child: CircularProgressIndicator(
+                                              value: progress.expectedTotalBytes != null
+                                                  ? progress.cumulativeBytesLoaded /
+                                                      progress.expectedTotalBytes!
+                                                  : null,
+                                              strokeWidth: 2,
                                             ),
-                                            Text(
-                                              post.timestamp,
-                                              style: TextStyle(
-                                                color: Colors.grey.shade600,
-                                                fontSize: 12,
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        height: 200,
+                                        color: Colors.grey.shade200,
+                                        child: const Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.broken_image, size: 40, color: Colors.grey),
+                                              SizedBox(height: 6),
+                                              Text(
+                                                "Could not load image",
+                                                style: TextStyle(color: Colors.grey, fontSize: 12),
                                               ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      BlocBuilder<LikeBloc, LikeState>(
-                                        builder: (context, likeState) {
-                                          String currentUserReaction = '';
-                                          bool isLikedByCurrentUser = false;
-                                          int realLikeCount = 0;
+                                    ),
+                                  )
+                                else if (post.imagePath.isNotEmpty)
+                                  Container(
+                                    constraints: const BoxConstraints(maxHeight: 480, minHeight: 200),
+                                    width: double.infinity,
+                                    color: Colors.grey.shade100,
+                                    child: Image.file(
+                                      File(post.imagePath),
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
 
-                                          if (likeState is LikesLoaded) {
-                                            final userLike = likeState.userLikes[post.id];
-                                            if (userLike != null && userLike.reaction.isNotEmpty) {
-                                              isLikedByCurrentUser = true;
-                                              currentUserReaction = userLike.reaction;
-                                            }
-                                            realLikeCount = likeState.likeCounts[post.id] ?? 0;
-                                          }
+                                // Subtle divider
+                                Divider(height: 1, thickness: 0.5, color: Colors.grey.shade200),
 
-                                          return GestureDetector(
-                                            onLongPressStart: (details) {
-                                              _showReactionMenu(
-                                                context,
-                                                details.globalPosition,
-                                                post,
-                                                isLikedByCurrentUser,
-                                              );
-                                            },
-                                            onTapUp: (details) {
-                                              if (post.id != null) {
-                                                final newReaction = isLikedByCurrentUser ? '' : '👍';
-                                                
-                                                context.read<LikeBloc>().add(
-                                                  ToggleLike(
-                                                    post.id!,
-                                                    post.userId,
-                                                    newReaction,
-                                                  ),
-                                                );
-                                                
-                                                if (newReaction.isNotEmpty) {
-                                                  _showFloatingAnimation(
-                                                    context,
-                                                    newReaction,
-                                                    details.globalPosition,
-                                                  );
-                                                }
+                                // 4. Action Buttons (Like & Comment) - Below Media, balanced full width
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 6.0),
+                                  child: Row(
+                                    children: [
+                                      // Like / Reaction Button (Expanded)
+                                      Expanded(
+                                        child: BlocBuilder<LikeBloc, LikeState>(
+                                          builder: (context, likeState) {
+                                            String currentUserReaction = '';
+                                            bool isLikedByCurrentUser = false;
+                                            int realLikeCount = 0;
+
+                                            if (likeState is LikesLoaded) {
+                                              final userLike = likeState.userLikes[post.id];
+                                              if (userLike != null && userLike.reaction.isNotEmpty) {
+                                                isLikedByCurrentUser = true;
+                                                currentUserReaction = userLike.reaction;
                                               }
-                                            },
+                                              realLikeCount = likeState.likeCounts[post.id] ?? 0;
+                                            }
+
+                                            return GestureDetector(
+                                              onLongPressStart: (details) {
+                                                _showReactionMenu(
+                                                  context,
+                                                  details.globalPosition,
+                                                  post,
+                                                  isLikedByCurrentUser,
+                                                );
+                                              },
+                                              onTapUp: (details) {
+                                                if (post.id != null) {
+                                                  final newReaction = isLikedByCurrentUser ? '' : '👍';
+                                                  context.read<LikeBloc>().add(
+                                                    ToggleLike(
+                                                      post.id!,
+                                                      post.userId,
+                                                      newReaction,
+                                                    ),
+                                                  );
+                                                  if (newReaction.isNotEmpty) {
+                                                    _showFloatingAnimation(
+                                                      context,
+                                                      newReaction,
+                                                      details.globalPosition,
+                                                    );
+                                                  }
+                                                }
+                                              },
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                                decoration: BoxDecoration(
+                                                  color: isLikedByCurrentUser
+                                                      ? Colors.blue.withValues(alpha: 0.1)
+                                                      : Colors.transparent,
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                child: Row(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    if (isLikedByCurrentUser)
+                                                      Text(
+                                                        currentUserReaction,
+                                                        style: const TextStyle(fontSize: 18),
+                                                      )
+                                                    else
+                                                      Icon(
+                                                        Icons.thumb_up_alt_outlined,
+                                                        size: 19,
+                                                        color: Colors.grey.shade700,
+                                                      ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      realLikeCount > 0
+                                                          ? "$realLikeCount Like${realLikeCount > 1 ? 's' : ''}"
+                                                          : "Like",
+                                                      style: TextStyle(
+                                                        fontSize: 13.5,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: isLikedByCurrentUser
+                                                            ? Colors.blue
+                                                            : Colors.grey.shade800,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+
+                                      // Vertical divider between Like & Comment
+                                      Container(
+                                        height: 20,
+                                        width: 1,
+                                        color: Colors.grey.shade300,
+                                      ),
+
+                                      // Comment Button (Expanded)
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            _showCommentBox(context, post);
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(vertical: 8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.transparent,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
                                             child: Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
-                                                if (isLikedByCurrentUser)
-                                                  Text(
-                                                    currentUserReaction,
-                                                    style: const TextStyle(fontSize: 18),
+                                                Icon(
+                                                  Icons.chat_bubble_outline_rounded,
+                                                  size: 19,
+                                                  color: Colors.grey.shade700,
+                                                ),
+                                                const SizedBox(width: 8),
+                                                if (post.id != null)
+                                                  StreamBuilder<QuerySnapshot>(
+                                                    stream: FirebaseFirestore.instance
+                                                        .collection('comments')
+                                                        .where('postId', isEqualTo: post.id)
+                                                        .snapshots(),
+                                                    builder: (context, commentSnap) {
+                                                      final count = commentSnap.hasData
+                                                          ? commentSnap.data!.docs.length
+                                                          : 0;
+                                                      return Text(
+                                                        count > 0
+                                                            ? "$count Comment${count > 1 ? 's' : ''}"
+                                                            : "Comment",
+                                                        style: TextStyle(
+                                                          fontSize: 13.5,
+                                                          fontWeight: FontWeight.w600,
+                                                          color: Colors.grey.shade800,
+                                                        ),
+                                                      );
+                                                    },
                                                   )
                                                 else
-                                                  const Icon(Icons.thumb_up_alt_outlined, size: 20),
-                                                if (realLikeCount > 0)
-                                                  Padding(
-                                                    padding: const EdgeInsets.only(left: 4.0),
-                                                    child: Text("$realLikeCount", style: const TextStyle(fontSize: 14)),
+                                                  Text(
+                                                    "Comment",
+                                                    style: TextStyle(
+                                                      fontSize: 13.5,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.grey.shade800,
+                                                    ),
                                                   ),
                                               ],
                                             ),
-                                          );
-                                        },
-                                      ),
-                                      const SizedBox(width: 16),
-                                      GestureDetector(
-                                        onTap: () {
-                                          _showCommentBox(context, post);
-                                        },
-                                        child: Row(
-                                          children: [
-                                            const Icon(Icons.comment_outlined, size: 20),
-                                            if (post.id != null)
-                                              StreamBuilder<QuerySnapshot>(
-                                                stream: FirebaseFirestore.instance
-                                                    .collection('comments')
-                                                    .where('postId', isEqualTo: post.id)
-                                                    .snapshots(),
-                                                builder: (context, commentSnap) {
-                                                  final count = commentSnap.hasData
-                                                      ? commentSnap.data!.docs.length
-                                                      : 0;
-                                                  if (count == 0) return const SizedBox.shrink();
-                                                  return Padding(
-                                                    padding: const EdgeInsets.only(left: 4.0),
-                                                    child: Text("$count", style: const TextStyle(fontSize: 14)),
-                                                  );
-                                                },
-                                              ),
-                                          ],
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                                if (post.caption.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8.0,
-                                      vertical: 2.0,
-                                    ),
-                                    child: Text(post.caption),
-                                  ),
-                                const SizedBox(height: 4),
-                             
-                                if (post.mediaType == 'video' && post.imagePath.startsWith('http'))
-                                  SizedBox(
-                                    height: MediaQuery.of(context).size.height * 0.18, 
-                                    width: double.infinity,
-                                    child: VideoPostPlayer(videoUrl: post.imagePath),
-                                  )
-                                else if (post.imagePath.startsWith('http'))
-                                  Image.network(
-                                    post.imagePath,
-                                    width: double.infinity,
-                                    height: MediaQuery.of(context).size.height * 0.18,
-                                    fit: BoxFit.cover,
-                                  )
-                                else if (post.imagePath.isNotEmpty)
-                                  Image.file(
-                                    File(post.imagePath),
-                                    width: double.infinity,
-                                    height: MediaQuery.of(context).size.height * 0.18,
-                                    fit: BoxFit.cover,
-                                  ),
                               ],
                             ),
                           );

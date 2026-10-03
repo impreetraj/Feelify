@@ -115,28 +115,30 @@ class LikeBloc extends Bloc<LikeEvent, LikeState> {
         );
         _likeCounts[event.postId] = (_likeCounts[event.postId] ?? 0) + 1;
 
-        // Send notification author
+        // Send notification to post author
         if (currentUser != event.postUserId) {
-          final userNameDoc = await firestore.collection('users').doc(currentUser).get();
-          final currentUserName = userNameDoc.data()?['name'] ?? 'Someone';
+          final senderDoc = await firestore.collection('users').doc(currentUser).get();
+          final senderName = senderDoc.data()?['name'] ?? 'Someone';
+          final message = '$senderName reacted ${event.reaction} to your post';
 
+          // 1. Database me save (History ke liye)
           await firestore
               .collection('users')
               .doc(event.postUserId)
               .collection('notifications')
               .add({
-            'message': '$currentUserName reacted ${event.reaction} to your post',
+            'message': message,
             'timestamp': DateTime.now().toIso8601String(),
           });
-          
-          // Send FCM Push Notification
-          final targetUserDoc = await firestore.collection('users').doc(event.postUserId).get();
-          final targetFCMToken = targetUserDoc.data()?['fcmToken'];
-          if (targetFCMToken != null) {
+
+          // 2. Mobile par popup (Alert ke liye)
+          final receiverDoc = await firestore.collection('users').doc(event.postUserId).get();
+          final fcmToken = receiverDoc.data()?['fcmToken'];
+          if (fcmToken != null) {
             PushNotificationService().sendNotification(
-              receiverToken: targetFCMToken,
+              receiverToken: fcmToken,
               title: "New Reaction",
-              body: "$currentUserName reacted ${event.reaction} to your post",
+              body: message,
             );
           }
         }

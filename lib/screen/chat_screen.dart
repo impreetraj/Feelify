@@ -33,11 +33,12 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.white,
         title: Padding(
           padding: const EdgeInsets.only(left: 10),
-          child: Text(
-            "Chat Ikokas",
+          child: const Text(
+            "Messages",
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Colors.green[800],
+              fontSize: 22,
+              letterSpacing: 0.3,
             ),
           ),
         ),

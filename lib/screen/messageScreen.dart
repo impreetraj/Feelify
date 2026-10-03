@@ -7,10 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:chat_ikokas/bloc/auth/auth_bloc.dart';
-import 'package:chat_ikokas/bloc/call/call_bloc.dart';
-import 'package:chat_ikokas/bloc/call/call_event.dart';
-import 'package:chat_ikokas/bloc/call/call_state.dart';
-import 'package:chat_ikokas/screen/outgoing_call_screen.dart';
+
 
 class Messagescreen extends StatefulWidget {
   final String peerId;
@@ -100,61 +97,27 @@ class _MessagescreenState extends State<Messagescreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocListener<CallBloc, CallState>(
-      listener: (context, state) {
-        if (state is CallInitiated) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OutgoingCallScreen(
-                callId: state.callId,
-                receiverName: widget.peerName,
-                receiverImage: widget.peerPhotoUrl,
-              ),
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              backgroundImage: widget.peerPhotoUrl.isNotEmpty
+                  ? NetworkImage(widget.peerPhotoUrl)
+                  : null,
+              child: widget.peerPhotoUrl.isEmpty
+                  ? const Icon(Icons.person, color: Colors.white)
+                  : null,
             ),
-          );
-        }
-      },
-      child: Scaffold(
-        resizeToAvoidBottomInset: true,
-        backgroundColor: Colors.grey[100],
-        appBar: AppBar(
-          titleSpacing: 0,
-          title: Row(
-            children: [
-              CircleAvatar(
-                backgroundImage: widget.peerPhotoUrl.isNotEmpty
-                    ? NetworkImage(widget.peerPhotoUrl)
-                    : null,
-                child: widget.peerPhotoUrl.isEmpty
-                    ? const Icon(Icons.person, color: Colors.white)
-                    : null,
-              ),
-              const SizedBox(width: 10),
-              Text(widget.peerName),
-            ],
-          ),
-          actions: [
-            IconButton(
-              icon: Icon(Icons.call),
-              onPressed: () {
-                final authState = context.read<AuthBloc>().state;
-                if (authState is Authenticated) {
-                  final user = authState.user;
-                  context.read<CallBloc>().add(
-                    InitiateCallEvent(
-                      receiverId: widget.peerId,
-                      callerId: user.uid,
-                      callerName: user.name ?? user.username,
-                      callerImage: user.profilePic ?? '',
-                    ),
-                  );
-                }
-              },
-            ),
+            const SizedBox(width: 10),
+            Text(widget.peerName),
           ],
-          backgroundColor: Colors.white,
         ),
+        backgroundColor: Colors.white,
+      ),
         body: SafeArea(
           child: Column(
             children: [
@@ -248,7 +211,6 @@ class _MessagescreenState extends State<Messagescreen> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 }

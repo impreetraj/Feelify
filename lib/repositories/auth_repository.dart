@@ -57,8 +57,7 @@ class AuthRepository {
     }
   }
 
-  // Returns UserModel and a boolean indicating if it's a new user (needs face registration)
-  Future<(UserModel, bool)> signInWithGoogle() async {
+  Future<UserModel> signInWithGoogle() async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn.instance;
       await googleSignIn.initialize(
@@ -81,10 +80,8 @@ class AuthRepository {
 
       final doc = await _firestore.collection('users').doc(user.uid).get();
       UserModel userModel;
-      bool isNewUser = false;
 
       if (!doc.exists || doc.data() == null) {
-        isNewUser = true;
         final username = user.email?.split('@')[0] ?? 'user_${user.uid.substring(0, 5)}';
         userModel = UserModel(
           uid: user.uid,
@@ -94,31 +91,12 @@ class AuthRepository {
         await _firestore.collection('users').doc(user.uid).set(userModel.toMap());
       } else {
         userModel = UserModel.fromMap(doc.data()!);
-        // If they don't have an embedding, consider them new for face auth purposes
-        if (doc.data()!['embedding'] == null) {
-          isNewUser = true;
-        }
       }
 
-      return (userModel, isNewUser);
+      return userModel;
     } catch (e) {
       throw Exception(e.toString());
     }
-  }
-
-  Future<void> saveFaceEmbedding(String uid, List<double> embedding) async {
-    await _firestore.collection('users').doc(uid).update({
-      'embedding': embedding,
-    });
-  }
-
-  Future<List<double>?> getFaceEmbedding(String uid) async {
-    final doc = await _firestore.collection('users').doc(uid).get();
-    if (doc.exists && doc.data() != null && doc.data()!.containsKey('embedding')) {
-      List<dynamic> dynamicList = doc.data()!['embedding'];
-      return dynamicList.map((e) => (e as num).toDouble()).toList();
-    }
-    return null;
   }
 
   Future<void> signOut() async {

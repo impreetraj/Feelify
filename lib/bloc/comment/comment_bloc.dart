@@ -112,23 +112,26 @@ class CommentBloc extends Bloc<CommentEvent, CommentState> {
       });
 
       if (uid != event.postUserId) {
+        final message = '$authorName commented on your post: ${event.content}';
+
+        // 1. Database me save (History ke liye)
         await firestore
             .collection('users')
             .doc(event.postUserId)
             .collection('notifications')
             .add({
-          'message': '$authorName commented on your post',
+          'message': message,
           'timestamp': DateTime.now().toIso8601String(),
         });
 
-        // Send FCM Push Notification
-        final targetUserDoc = await firestore.collection('users').doc(event.postUserId).get();
-        final targetFCMToken = targetUserDoc.data()?['fcmToken'];
-        if (targetFCMToken != null) {
+        // 2. Mobile par popup (Alert ke liye)
+        final receiverDoc = await firestore.collection('users').doc(event.postUserId).get();
+        final fcmToken = receiverDoc.data()?['fcmToken'];
+        if (fcmToken != null) {
           PushNotificationService().sendNotification(
-            receiverToken: targetFCMToken,
+            receiverToken: fcmToken,
             title: "New Comment",
-            body: "$authorName commented on your post: ${event.content}",
+            body: message,
           );
         }
       }

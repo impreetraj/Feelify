@@ -5,8 +5,7 @@ import 'package:chat_ikokas/screen/notify_screen.dart';
 import 'package:chat_ikokas/screen/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:chat_ikokas/globals.dart';
-import 'package:chat_ikokas/services/call_page.dart';
+
 
 class NavigationScreen extends StatefulWidget {
   const NavigationScreen({super.key});
@@ -27,26 +26,7 @@ class _NavigationScreenState extends State<NavigationScreen> {
     const ProfileScreen(),
   ];
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkPendingCall();
-    });
-  }
 
-  void _checkPendingCall() {
-    if (pendingCallId != null) {
-      final callId = pendingCallId!;
-      pendingCallId = null;
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CallPage(callID: callId),
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

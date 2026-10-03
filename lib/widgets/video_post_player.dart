@@ -34,11 +34,17 @@ class _VideoPostPlayerState extends State<VideoPostPlayer> {
 
       _chewieController = ChewieController(
         videoPlayerController: _videoPlayerController,
+        aspectRatio: _videoPlayerController.value.aspectRatio > 0
+            ? _videoPlayerController.value.aspectRatio
+            : 16 / 9,
         autoPlay: false,
         looping: true,
         showControls: true,
-        allowFullScreen: true,
+        allowFullScreen: false,
+        fullScreenByDefault: false,
         allowMuting: true,
+        allowPlaybackSpeedChanging: false,
+        routePageBuilder: (context, animation, secondaryAnimation, provider) => const SizedBox(),
         placeholder: Container(
           color: Colors.black12,
           child: const Center(
@@ -121,18 +127,22 @@ class _VideoPostPlayerState extends State<VideoPostPlayer> {
       );
     }
 
-    return AspectRatio(
-      aspectRatio: _videoPlayerController.value.aspectRatio,
-      child: VisibilityDetector(
-        key: Key(widget.videoUrl),
-        onVisibilityChanged: (info) {
-          if (info.visibleFraction > 0.9) {
-            _chewieController?.play();
-          } else {
-            _chewieController?.pause();
-          }
-        },
-        child: Chewie(controller: _chewieController!),
+    return Center(
+      child: AspectRatio(
+        aspectRatio: _videoPlayerController.value.aspectRatio > 0
+            ? _videoPlayerController.value.aspectRatio
+            : 16 / 9,
+        child: VisibilityDetector(
+          key: Key(widget.videoUrl),
+          onVisibilityChanged: (info) {
+            if (info.visibleFraction > 0.7) {
+              _chewieController?.play();
+            } else {
+              _chewieController?.pause();
+            }
+          },
+          child: Chewie(controller: _chewieController!),
+        ),
       ),
     );
   }

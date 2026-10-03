@@ -1,5 +1,4 @@
 import 'package:equatable/equatable.dart';
-import '../../models/user_model.dart';
 
 abstract class AuthEvent extends Equatable {
   const AuthEvent();
@@ -33,14 +32,3 @@ class SignOutRequested extends AuthEvent {}
 class AuthCheckRequested extends AuthEvent {}
 
 class GoogleSignInRequested extends AuthEvent {}
-
-class FaceVerificationCompleted extends AuthEvent {
-  final UserModel user;
-  final List<double> embedding;
-  final bool isSignUp;
-
-  const FaceVerificationCompleted(this.user, this.embedding, this.isSignUp);
-
-  @override
-  List<Object?> get props => [user, embedding, isSignUp];
-}

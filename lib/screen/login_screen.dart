@@ -4,8 +4,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:chat_ikokas/bloc/auth/auth_bloc.dart';
 import 'package:chat_ikokas/bloc/auth/auth_event.dart';
 import 'package:chat_ikokas/bloc/auth/auth_state.dart';
-import 'package:chat_ikokas/screen/home_screen.dart';
-import 'package:chat_ikokas/screen/face_capture_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -60,8 +58,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       listener: (context, state) {
                         if (state is Authenticated) {
                           Navigator.popUntil(context, (route) => route.isFirst);
-                        } else if (state is FaceVerificationRequired) {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => FaceCaptureScreen(user: state.user, isSignUp: state.isSignUp)));
                         } else if (state is AuthError) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(state.error)),
